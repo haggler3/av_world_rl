@@ -1,3 +1,5 @@
+> **This repo now lives in the [`av_world`](https://github.com/haggler3/av_world) monorepo** (`avrl/`, `dwm/`, with full history). New work happens there.
+
 # av_world_rl
 
 Learning on top of [`small_av_world`](https://github.com/haggler3/small_av_world), the Rust city simulator:
