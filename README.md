@@ -197,15 +197,22 @@ On 4,000 held-out windows (CRPS; lower is better):
 
 ![diffusion world model](docs/img/diffusion_world_model.gif)
 
-**Open problem: the sampled futures are not smooth.** The final MLP outputs 30 steps independently and its samples are
-~51x rougher than real trajectories (visible in the GIF). Generating 10 control points and interpolating fixes most of it
-and improves accuracy at equal steps (skill 0.36 vs 0.45, roughness 4.8x) but narrows the bands (86 % coverage). A DiT-style
-attention denoiser (`net="attn"`: history and future-step tokens, adaLN, action per token) is implemented but not yet
-trained or compared; the final model and the GIF above predate both fixes.
+**Smoother futures (`python -m dwm.quick`, 6.4 min end to end on a 200k-window sample):** the model above generates 30
+steps independently and its samples are ~51x rougher than real trajectories. Generating 10 control points and
+interpolating fixes most of that. In a 60 s head-to-head on the sample, the 10-control-point MLP reached skill 0.55; a small
+DiT-style attention denoiser (`net="attn"`, 64x2) only managed 800 steps on this CPU and was far behind (2.5): inconclusive,
+it needs a GPU or a longer budget. The MLP trained for 3 min (12,900 steps) is the model in the GIF:
+
+| (800 held-out windows) | kinematic | 30-step model (above) | 10 control points (`results/dwm/quick`) |
+|---|---|---|---|
+| skill vs kinematic | 1.0 | 0.33 | 0.43 |
+| gap CRPS at 3 s | 1.62 m | 0.33 m | 0.32 m |
+| roughness vs real trajectories | - | ~51x | **4.2x** |
+| 90 % band coverage (gap, 3 s) | - | 91 % | 84 % (somewhat over-confident) |
 
 ```bash
 python -m dwm.data data/city10.bin data/dwm      # windows from AV_TRANSITIONS logs
 python -m dwm.ablate --budget 90                  # equal-budget ablations
 python -m dwm.train --budget 450 --cfg '{"sample_steps": 5}' --out results/dwm/final
-python -m dwm.viz                                 # the GIF
+python -m dwm.quick                               # small fast pass: compare, train 3 min, redraw the GIF
 ```

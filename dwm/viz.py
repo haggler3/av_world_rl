@@ -65,7 +65,7 @@ def pick_scenes(d, n=3, seed=4):
     return np.array(picks[:n])
 
 
-def render(model_path, data_path, out, K=24, steps=None, fps=14, data=None, interp=4):
+def render(model_path, data_path, out, K=24, steps=None, fps=14, data=None, interp=4, hold=10, dpi=100):
     with open(model_path, "rb") as f:
         blob = pickle.load(f)
     cfg, p = blob["cfg"], jax.tree.map(jnp.asarray, blob["params"])
@@ -94,8 +94,8 @@ def render(model_path, data_path, out, K=24, steps=None, fps=14, data=None, inte
     # frame plan: per scene, denoise (steps + 1 frames, eased) + hold + playback (F frames) + hold
     plan = []
     for s in range(len(idx)):
-        plan += [(s, "noise", k) for k in range(n_den + 1)] + [(s, "noise", n_den)] * 10
-        plan += [(s, "play", k) for k in range(F)] + [(s, "play", F - 1)] * 10
+        plan += [(s, "noise", k) for k in range(n_den + 1)] + [(s, "noise", n_den)] * hold
+        plan += [(s, "play", k) for k in range(F)] + [(s, "play", F - 1)] * hold
 
     fig = plt.figure(figsize=(9.6, 5.4), facecolor=BG)
     gs = fig.add_gridspec(2, 2, width_ratios=[1.15, 1], height_ratios=[1, 1], left=0.07, right=0.98, top=0.80, bottom=0.1,
@@ -186,7 +186,7 @@ def render(model_path, data_path, out, K=24, steps=None, fps=14, data=None, inte
         return []
 
     anim = FuncAnimation(fig, draw, frames=len(plan), blit=False)
-    anim.save(out, writer=PillowWriter(fps=fps), savefig_kwargs={"facecolor": BG})
+    anim.save(out, writer=PillowWriter(fps=fps), dpi=dpi, savefig_kwargs={"facecolor": BG})
     plt.close(fig)
     print("wrote", out, len(plan), "frames")
 
