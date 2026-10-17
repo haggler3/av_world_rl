@@ -1,0 +1,35 @@
+{
+ "rule (IDM + stop-line governor)": {
+  "km": 809.8,
+  "mean_speed_kmh": 13.9,
+  "hard_brakes_per_km": 0.146,
+  "collisions_per_1000km": 0.0,
+  "red_runs_per_100_segments": 0.0,
+  "blocked_entries_per_100_segments": 0.0,
+  "rms_jerk": 0.886,
+  "reward_per_step": 0.0001,
+  "envelope_interventions_pct_of_steps": 0.142
+ },
+ "learned (PPO) inside the safety envelope": {
+  "km": 832.9,
+  "mean_speed_kmh": 14.3,
+  "hard_brakes_per_km": 0.077,
+  "collisions_per_1000km": 1.2,
+  "red_runs_per_100_segments": 0.0,
+  "blocked_entries_per_100_segments": 0.0,
+  "rms_jerk": 1.086,
+  "reward_per_step": 0.0034,
+  "envelope_interventions_pct_of_steps": 0.124
+ },
+ "learned (PPO), envelope switched off": {
+  "km": 834.2,
+  "mean_speed_kmh": 14.32,
+  "hard_brakes_per_km": 0.055,
+  "collisions_per_1000km": 10.79,
+  "red_runs_per_100_segments": 0.417,
+  "blocked_entries_per_100_segments": 0.718,
+  "rms_jerk": 1.03,
+  "reward_per_step": -0.0045,
+  "envelope_interventions_pct_of_steps": 0.0
+ }
+}
