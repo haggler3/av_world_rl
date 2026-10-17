@@ -1,0 +1,7 @@
+{"variant": "diffusion (base, 5 DDIM steps)", "steps": 2500, "train_s": 55.3, "skill_vs_kinematic": 0.854, "crps_gap_1s": 0.501, "crps_gap_3s": 0.855, "crps_lead_v_3s": 0.329, "mae_mean_gap_3s": 1.095}
+{"variant": "deterministic regressor", "steps": 2500, "train_s": 53.3, "skill_vs_kinematic": 0.602, "crps_gap_1s": 0.325, "crps_gap_3s": 0.741, "crps_lead_v_3s": 0.347, "mae_mean_gap_3s": 0.741}
+{"variant": "diffusion (base, 5 DDIM steps)", "steps": 8000, "train_s": 157.3, "skill_vs_kinematic": 0.451, "crps_gap_1s": 0.224, "crps_gap_3s": 0.504, "crps_lead_v_3s": 0.232, "mae_mean_gap_3s": 0.726, "coverage90_gap_3s": 0.933}
+{"variant": "deterministic regressor", "steps": 8000, "train_s": 145.4, "skill_vs_kinematic": 0.529, "crps_gap_1s": 0.387, "crps_gap_3s": 0.645, "crps_lead_v_3s": 0.243, "mae_mean_gap_3s": 0.645, "coverage90_gap_3s": NaN}
+{"variant": "diffusion, 30 free steps (base)", "steps": 8000, "train_s": 185.4, "skill_vs_kinematic": 0.451, "crps_gap_1s": 0.224, "crps_gap_3s": 0.504, "crps_lead_v_3s": 0.232, "coverage90_gap_3s": 0.933, "roughness_gap_vs_real": 51.45}
+{"variant": "diffusion, 10 control points", "steps": 8000, "train_s": 154.3, "skill_vs_kinematic": 0.356, "crps_gap_1s": 0.187, "crps_gap_3s": 0.401, "crps_lead_v_3s": 0.197, "coverage90_gap_3s": 0.861, "roughness_gap_vs_real": 4.77}
+{"variant": "diffusion, 6 control points", "steps": 8000, "train_s": 150.1, "skill_vs_kinematic": 0.379, "crps_gap_1s": 0.245, "crps_gap_3s": 0.354, "crps_lead_v_3s": 0.191, "coverage90_gap_3s": 0.81, "roughness_gap_vs_real": 1.55}

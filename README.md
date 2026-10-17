@@ -167,3 +167,45 @@ tests/      env physics and rules, determinism, safety envelope, PPO update
 results/    final/ (policy.npz, log.csv, compare.json, figures), wm/ (world model results and weights)
 docs/img/   figures used here
 ```
+
+## A diffusion world model of the city (`dwm/`)
+
+A separate model: given 1 s of an AV's history (all 22 features) and its next 3 s of planned actions, it samples many
+possible 3 s futures of speed, distance to the line, leader visibility, gap, leader speed and the must-stop flag.
+It is trained on 1.08 M windows from 693 AVs logged in `small_av_world` (10 % share, morning peak), split by vehicle.
+
+The key design choice is a **physics residual**: the AV's own motion is almost fully determined by its actions, so a
+kinematic model (actions through the vehicle model, leader at constant speed) predicts it and diffusion only learns how the
+world deviates from it, which is mostly what the car ahead does.
+
+**Final run** (`python -m dwm.train --budget 450 --cfg '{"sample_steps": 5}'`): 549 s end to end on 4 CPU cores (load,
+22,100 training steps, evaluation), 1.1 M-parameter MLP denoiser, v-prediction, 5 DDIM steps, 0.06 ms per sampled future.
+On 4,000 held-out windows (CRPS; lower is better):
+
+| | kinematic | constant velocity | diffusion world model |
+|---|---|---|---|
+| gap to leader at 1 s / 3 s | 0.34 / 1.62 m | 0.31 / 1.55 m | **0.13 / 0.33 m** |
+| leader speed at 3 s | 0.87 m/s | 0.87 m/s | **0.19 m/s** |
+| AV speed at 3 s | 0.039 m/s | 1.18 m/s | **0.009 m/s** |
+| real outcome inside the 90 % band (gap, 3 s) | - | - | **90.8 %** |
+
+**Ablations** (`results/dwm/ablations.md`: 90 s each; `results/dwm/step_matched.txt`: equal training steps):
+* the physics residual is essential (without it 10x worse); conditioning on the planned actions is essential; 1 s of history helps;
+* v-prediction ~ x0-prediction in accuracy but x0 is over-confident (85 % coverage); eps-prediction fails at this budget;
+* 5 DDIM steps is best (2 is over-confident, 20 no better); conv and a 5 M-parameter MLP are too slow to train on this CPU;
+* **diffusion vs a deterministic regressor with the same network: the regressor wins at 2,500 steps (0.60 vs 0.85 skill), diffusion wins at 8,000 (0.45 vs 0.53)** and is the only one with calibrated uncertainty.
+
+![diffusion world model](docs/img/diffusion_world_model.gif)
+
+**Open problem: the sampled futures are not smooth.** The final MLP outputs 30 steps independently and its samples are
+~51x rougher than real trajectories (visible in the GIF). Generating 10 control points and interpolating fixes most of it
+and improves accuracy at equal steps (skill 0.36 vs 0.45, roughness 4.8x) but narrows the bands (86 % coverage). A DiT-style
+attention denoiser (`net="attn"`: history and future-step tokens, adaLN, action per token) is implemented but not yet
+trained or compared; the final model and the GIF above predate both fixes.
+
+```bash
+python -m dwm.data data/city10.bin data/dwm      # windows from AV_TRANSITIONS logs
+python -m dwm.ablate --budget 90                  # equal-budget ablations
+python -m dwm.train --budget 450 --cfg '{"sample_steps": 5}' --out results/dwm/final
+python -m dwm.viz                                 # the GIF
+```
