@@ -19,7 +19,7 @@ from .data import F, H, NC, OBS_DIM
 
 @dataclass(frozen=True)
 class Cfg:
-    kind: str = "diffusion"  # "diffusion" | "regress"
+    kind: str = "diffusion"  # "diffusion" | "flow" (rectified flow / flow matching) | "regress"
     target: str = "residual"  # "residual": future minus the kinematic prediction | "delta": future minus the current value
     net: str = "mlp"  # "mlp" | "conv" | "attn" (DiT-style transformer over history + future tokens)
     heads: int = 4
@@ -157,7 +157,7 @@ def _attn_apply(p, cfg: Cfg, x, t, cond):
         a_tok = act @ (U / U.sum(0, keepdims=True))  # each token's action (the mean over the steps it covers)
         fut_in = jnp.concatenate([x, a_tok[..., None]], -1)
     h = jnp.concatenate([dense(p["hist_in"], hist), dense(p["fut_in"], fut_in)], 1) + p["pos"][None]
-    c = dense(p["temb"][1], jax.nn.silu(dense(p["temb"][0], time_embed(t * 1000.0)))) if cfg.kind == "diffusion" else jnp.zeros((B, cfg.width))
+    c = dense(p["temb"][1], jax.nn.silu(dense(p["temb"][0], time_embed(t * 1000.0)))) if cfg.kind != "regress" else jnp.zeros((B, cfg.width))
     c = jax.nn.silu(c)
     for blk in p["blocks"]:
         s1, b1, g1, s2, b2, g2 = jnp.split(dense(blk["ada"], c)[:, None], 6, -1)
@@ -178,7 +178,7 @@ def apply(p, cfg: Cfg, x, t, cond):
     if cfg.net == "attn":
         return _attn_apply(p, cfg, x, t, cond)
     c = dense(p["cond"][1], jax.nn.silu(dense(p["cond"][0], cond)))
-    if cfg.kind == "diffusion":
+    if cfg.kind != "regress":
         c = c + dense(p["temb"][1], jax.nn.silu(dense(p["temb"][0], time_embed(t * 1000.0))))
     c = jax.nn.silu(c)
     B = x.shape[0]
@@ -205,6 +205,11 @@ def loss_fn(p, cfg: Cfg, ab, x0, cond, key):
     if cfg.kind == "regress":
         return ((apply(p, cfg, jnp.zeros_like(x0), jnp.zeros(B), cond) - x0) ** 2).mean()
     k1, k2, k3 = jax.random.split(key, 3)
+    if cfg.kind == "flow":  # straight path noise -> data, regress its constant velocity
+        t = jax.random.uniform(k1, (B, 1, 1))
+        z = jax.random.normal(k2, x0.shape)
+        xt = (1 - t) * z + t * x0
+        return ((apply(p, cfg, xt, t[:, 0, 0], cond) - (x0 - z)) ** 2).mean()
     if cfg.cond_drop > 0:  # hide the actions (and their presence flag) for a random share of the batch
         keep = (jax.random.uniform(k3, (B, 1)) >= cfg.cond_drop).astype(cond.dtype)
         cond = jnp.concatenate([cond[:, :-(F + 1)], cond[:, -(F + 1):] * keep], 1)
@@ -236,6 +241,8 @@ def sample(p, cfg: Cfg, ab, cond, key, steps=None, guidance=None, eta=None):
     if cfg.kind == "regress":
         return apply(p, cfg, jnp.zeros((B, seq_len(cfg), n_ch(cfg))), jnp.zeros(B), cond)
     S = steps or cfg.sample_steps
+    if cfg.kind == "flow":
+        return trace(p, cfg, ab, cond, key, S)[-1]
     w = cfg.guidance if guidance is None else guidance
     cond_u = jnp.concatenate([cond[:, :-(F + 1)], jnp.zeros_like(cond[:, -(F + 1):])], 1) if cfg.cond_drop > 0 else cond
     ts = jnp.linspace(cfg.T, 0, S + 1).round().astype(jnp.int32)  # T .. 0
@@ -260,6 +267,28 @@ def sample(p, cfg: Cfg, ab, cond, key, steps=None, guidance=None, eta=None):
 
     x, _ = jax.lax.scan(body, x, jnp.arange(S))
     return x
+
+
+def trace(p, cfg: Cfg, ab, cond, key, steps):
+    """Every intermediate state of the sampler, [S + 1, B, L, C']: Euler steps of the flow ODE, or DDIM steps."""
+    B = cond.shape[0]
+    x = jax.random.normal(key, (B, seq_len(cfg), n_ch(cfg)))
+    if cfg.kind == "flow":
+        def body(x, k):
+            xn = x + apply(p, cfg, x, jnp.full((B,), k / steps), cond) / steps
+            return xn, xn
+    else:
+        ts = jnp.linspace(cfg.T, 0, steps + 1).round().astype(jnp.int32)
+
+        def body(x, k):
+            i, j = ts[k], ts[k + 1]
+            a = ab[i - 1]
+            a_next = jnp.where(j > 0, ab[jnp.maximum(j - 1, 0)], 1.0)
+            x0, eps = to_x0_eps(cfg, apply(p, cfg, x, jnp.full((B,), i / cfg.T), cond), x, a)
+            xn = jnp.sqrt(a_next) * jnp.clip(x0, -8.0, 8.0) + jnp.sqrt(1 - a_next) * eps
+            return xn, xn
+    _, xs = jax.lax.scan(body, x, jnp.arange(steps))
+    return jnp.concatenate([x[None], xs], 0)
 
 
 def n_params(p):

@@ -1,0 +1,42 @@
+[
+ {
+  "variant": "diffusion \u00b7 10 control points",
+  "steps": 3700,
+  "skill_vs_kinematic": 0.563,
+  "crps_gap_3s": 0.581,
+  "crps_lead_v_3s": 0.281,
+  "coverage90_gap_3s": 0.782,
+  "roughness_vs_real": 5.03,
+  "sample_ms_per_future": 0.198
+ },
+ {
+  "variant": "diffusion \u00b7 DCT basis",
+  "steps": 4100,
+  "skill_vs_kinematic": 0.531,
+  "crps_gap_3s": 0.464,
+  "crps_lead_v_3s": 0.251,
+  "coverage90_gap_3s": 0.736,
+  "roughness_vs_real": 2.33,
+  "sample_ms_per_future": 0.177
+ },
+ {
+  "variant": "diffusion \u00b7 leader physics decoder",
+  "steps": 4100,
+  "skill_vs_kinematic": 0.536,
+  "crps_gap_3s": 0.55,
+  "crps_lead_v_3s": 0.291,
+  "coverage90_gap_3s": 0.487,
+  "roughness_vs_real": 0.21,
+  "sample_ms_per_future": 0.231
+ },
+ {
+  "variant": "flow matching \u00b7 DCT basis",
+  "steps": 4500,
+  "skill_vs_kinematic": 0.453,
+  "crps_gap_3s": 0.452,
+  "crps_lead_v_3s": 0.237,
+  "coverage90_gap_3s": 0.744,
+  "roughness_vs_real": 3.15,
+  "sample_ms_per_future": 0.202
+ }
+]

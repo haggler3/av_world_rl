@@ -282,7 +282,7 @@ def main():
     print(cfg)
     res = train(cfg, d, st, a.budget)
     idx = eval_idx(d, a.eval_n)
-    pred, sample_s = sample_physical(res, cfg, st, d, idx, a.K if cfg.kind == "diffusion" else 1)
+    pred, sample_s = sample_physical(res, cfg, st, d, idx, a.K if cfg.kind != "regress" else 1)
     out = {"cfg": cfg.__dict__ | {"extra": None}, "steps": res["steps"], "train_s": round(res["train_s"], 1),
            "n_params": res["n_params"], "sample_ms_per_future": round(1000 * sample_s / (len(idx) * pred.shape[1]), 4)}
     base = {k: metrics(v, d, idx) for k, v in baselines(d, idx).items()}

@@ -54,7 +54,7 @@ def main():
     for name, over in VARIANTS:
         cfg = M.Cfg(**over)
         res = T.train(cfg, d, st, a.budget, verbose=False)
-        K = a.K if cfg.kind == "diffusion" else 1
+        K = a.K if cfg.kind != "regress" else 1
         pred, ss = T.sample_physical(res, cfg, st, d, idx, K)
         r = row(name, T.metrics(pred, d, idx), ref, {"steps": res["steps"], "params": res["n_params"],
                                                      "ms_per_future": round(1000 * ss / (len(idx) * K), 3)})

@@ -230,10 +230,31 @@ What was learned:
 * **Open:** the compact bases are over-confident at 60 s (52-81 % coverage for a 90 % band). The 30-step model reached 91 %
   only after 22k steps, so the next test is a longer DCT run.
 
+**Flow matching vs diffusion, and a 2D GIF per model (`python -m dwm.gifs2d`, 5 min: 60 s of training each, same 800 windows):**
+rectified flow (`kind="flow"`) uses the same network but learns a velocity field that carries noise straight to a future,
+sampled with 10 Euler steps.
+
+| model | skill vs kinematic | gap CRPS 3 s | leader speed CRPS 3 s | 90 % coverage | roughness vs real |
+|---|---|---|---|---|---|
+| diffusion, 10 control points | 0.56 | 0.58 m | 0.28 m/s | 78 % | 5.0x |
+| diffusion, DCT | 0.53 | 0.46 m | 0.25 m/s | 74 % | 2.3x |
+| diffusion, leader physics decoder | 0.54 | 0.55 m | 0.29 m/s | 49 % | 0.21x |
+| **flow matching, DCT** | **0.45** | **0.45 m** | **0.24 m/s** | 74 % | 3.2x |
+
+At this budget flow matching is the best model so far: same network, same data, 15 % better skill than diffusion with the
+same basis. All four are still over-confident (49-78 % coverage for a 90 % band). Same held-out scene, top-down (blue: the
+AV, pink: 16 imagined leaders, white: the real one):
+
+| | |
+|---|---|
+| ![control points](docs/img/dwm_control_points.gif) | ![DCT](docs/img/dwm_dct.gif) |
+| ![leader physics](docs/img/dwm_leader_physics.gif) | ![flow matching](docs/img/dwm_flow_dct.gif) |
+
 ```bash
 python -m dwm.data data/city10.bin data/dwm      # windows from AV_TRANSITIONS logs
 python -m dwm.ablate --budget 90                  # equal-budget ablations
 python -m dwm.train --budget 450 --cfg '{"sample_steps": 5}' --out results/dwm/final
 python -m dwm.quick                               # small fast pass: compare, train 3 min, redraw the GIF
 python -m dwm.explore                             # 60 s architecture experiments (bases, guidance, observation noise)
+python -m dwm.gifs2d                              # diffusion bases vs flow matching, one 2D GIF each
 ```
