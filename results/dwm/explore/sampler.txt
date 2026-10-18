@@ -1,0 +1,8 @@
+{"basis": "DCT", "sample_steps": 5, "eta": 0.0, "skill_vs_kinematic": 0.509, "crps_gap_3s": 0.455, "coverage90_gap_3s": 0.726, "roughness_vs_real": 2.2}
+{"basis": "DCT", "sample_steps": 5, "eta": 1.0, "skill_vs_kinematic": 0.499, "crps_gap_3s": 0.437, "coverage90_gap_3s": 0.641, "roughness_vs_real": 1.42}
+{"basis": "DCT", "sample_steps": 10, "eta": 0.5, "skill_vs_kinematic": 0.519, "crps_gap_3s": 0.464, "coverage90_gap_3s": 0.736, "roughness_vs_real": 2.78}
+{"basis": "DCT", "sample_steps": 10, "eta": 1.0, "skill_vs_kinematic": 0.506, "crps_gap_3s": 0.457, "coverage90_gap_3s": 0.695, "roughness_vs_real": 1.63}
+{"basis": "leader physics", "sample_steps": 5, "eta": 0.0, "skill_vs_kinematic": 0.541, "crps_gap_3s": 0.556, "coverage90_gap_3s": 0.495, "roughness_vs_real": 0.21}
+{"basis": "leader physics", "sample_steps": 5, "eta": 1.0, "skill_vs_kinematic": 0.54, "crps_gap_3s": 0.558, "coverage90_gap_3s": 0.477, "roughness_vs_real": 0.2}
+{"basis": "leader physics", "sample_steps": 10, "eta": 0.5, "skill_vs_kinematic": 0.533, "crps_gap_3s": 0.546, "coverage90_gap_3s": 0.6, "roughness_vs_real": 0.21}
+{"basis": "leader physics", "sample_steps": 10, "eta": 1.0, "skill_vs_kinematic": 0.529, "crps_gap_3s": 0.552, "coverage90_gap_3s": 0.531, "roughness_vs_real": 0.19}

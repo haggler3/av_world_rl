@@ -31,6 +31,13 @@ class Cfg:
     use_actions: bool = True
     hist_len: int = H  # how many history steps the model sees (1 = only the current features)
     knots: int = 0  # > 0: generate this many control points over the 3 s and interpolate linearly (smooth futures)
+    basis: str = "legacy"  # "legacy" (steps / knots above) | "steps" | "knots" | "dct" | "leader_phys" (see basis.py)
+    nb: int = 10  # latent size per channel for the bases
+    lat: int = 0  # latent length, set by train.py for the non-legacy bases (the latent is [lat, 1])
+    cond_drop: float = 0.0  # > 0: hide the actions this often in training (classifier-free guidance)
+    guidance: float = 1.0  # sampling: out = uncond + guidance * (cond - uncond)
+    eta: float = 0.0  # DDIM stochasticity: 0 deterministic, 1 = DDPM-like (more spread)
+    obs_noise: bool = False  # add measurement noise with the spread of what the basis cannot represent (an observation model)
     ema: float = 0.999
     lr: float = 1e-3
     batch: int = 512
@@ -81,7 +88,11 @@ def conv1d(p, x):
 
 
 def seq_len(cfg: Cfg):
-    return cfg.knots or F
+    return cfg.lat or cfg.knots or F
+
+
+def n_ch(cfg: Cfg):
+    return 1 if cfg.lat else NC
 
 
 def upsampler(cfg: Cfg):
@@ -99,7 +110,7 @@ def upsampler(cfg: Cfg):
 
 
 def cond_dim(cfg: Cfg):
-    return cfg.hist_len * OBS_DIM + (F if cfg.use_actions else 0)
+    return cfg.hist_len * OBS_DIM + (F if cfg.use_actions else 0) + (1 if cfg.cond_drop > 0 else 0)
 
 
 def init(key, cfg: Cfg):
@@ -119,10 +130,10 @@ def init(key, cfg: Cfg):
         p["out"] = dense_init(next(ks), D, NC, 0.1)
         del p["cond"]  # history and actions enter as tokens; only the noise level is global (p["temb"])
     elif cfg.net == "mlp":
-        p["inp"] = dense_init(next(ks), seq_len(cfg) * NC, W)
+        p["inp"] = dense_init(next(ks), seq_len(cfg) * n_ch(cfg), W)
         p["blocks"] = [{"film": dense_init(next(ks), W, 2 * W, 0.1), "l1": dense_init(next(ks), W, W),
                         "l2": dense_init(next(ks), W, W, 0.1)} for _ in range(cfg.depth)]
-        p["out"] = dense_init(next(ks), W, seq_len(cfg) * NC, 0.1)
+        p["out"] = dense_init(next(ks), W, seq_len(cfg) * n_ch(cfg), 0.1)
     else:
         C = W // 4
         cv = lambda k, ci, co, s=1.0: {"w": jax.random.normal(k, (5, ci, co)) * s / np.sqrt(5 * ci), "b": jnp.zeros(co)}  # noqa: E731
@@ -178,7 +189,7 @@ def apply(p, cfg: Cfg, x, t, cond):
             y = layernorm(h) * (1 + g) + b
             y = dense(blk["l2"], jax.nn.silu(dense(blk["l1"], jax.nn.silu(y))))
             h = h + y
-        return dense(p["out"], jax.nn.silu(layernorm(h))).reshape(B, seq_len(cfg), NC)
+        return dense(p["out"], jax.nn.silu(layernorm(h))).reshape(B, seq_len(cfg), n_ch(cfg))
     h = conv1d(p["inp"], x)
     for blk in p["blocks"]:
         g, b = jnp.split(dense(blk["film"], c), 2, -1)
@@ -193,7 +204,10 @@ def loss_fn(p, cfg: Cfg, ab, x0, cond, key):
     B = x0.shape[0]
     if cfg.kind == "regress":
         return ((apply(p, cfg, jnp.zeros_like(x0), jnp.zeros(B), cond) - x0) ** 2).mean()
-    k1, k2 = jax.random.split(key)
+    k1, k2, k3 = jax.random.split(key, 3)
+    if cfg.cond_drop > 0:  # hide the actions (and their presence flag) for a random share of the batch
+        keep = (jax.random.uniform(k3, (B, 1)) >= cfg.cond_drop).astype(cond.dtype)
+        cond = jnp.concatenate([cond[:, :-(F + 1)], cond[:, -(F + 1):] * keep], 1)
     i = jax.random.randint(k1, (B,), 0, cfg.T)
     a = ab[i][:, None, None]
     eps = jax.random.normal(k2, x0.shape)
@@ -216,23 +230,33 @@ def to_x0_eps(cfg, out, xt, a):
     return x0, eps
 
 
-def sample(p, cfg: Cfg, ab, cond, key, steps=None):
+def sample(p, cfg: Cfg, ab, cond, key, steps=None, guidance=None, eta=None):
     """DDIM (eta = 0) from pure noise: one sample per row of `cond`. Returns normalised futures [B, L, C] (L = seq_len)."""
     B = cond.shape[0]
     if cfg.kind == "regress":
-        return apply(p, cfg, jnp.zeros((B, seq_len(cfg), NC)), jnp.zeros(B), cond)
+        return apply(p, cfg, jnp.zeros((B, seq_len(cfg), n_ch(cfg))), jnp.zeros(B), cond)
     S = steps or cfg.sample_steps
+    w = cfg.guidance if guidance is None else guidance
+    cond_u = jnp.concatenate([cond[:, :-(F + 1)], jnp.zeros_like(cond[:, -(F + 1):])], 1) if cfg.cond_drop > 0 else cond
     ts = jnp.linspace(cfg.T, 0, S + 1).round().astype(jnp.int32)  # T .. 0
-    x = jax.random.normal(key, (B, seq_len(cfg), NC))
+    eta = cfg.eta if eta is None else eta
+    key, knoise = jax.random.split(key)
+    x = jax.random.normal(key, (B, seq_len(cfg), n_ch(cfg)))
 
     def body(x, k):
         i, j = ts[k], ts[k + 1]
         a = ab[i - 1]
         a_next = jnp.where(j > 0, ab[jnp.maximum(j - 1, 0)], 1.0)
-        out = apply(p, cfg, x, jnp.full((B,), i / cfg.T), cond)
+        tt = jnp.full((B,), i / cfg.T)
+        out = apply(p, cfg, x, tt, cond)
+        if cfg.cond_drop > 0 and w != 1.0:
+            out_u = apply(p, cfg, x, tt, cond_u)
+            out = out_u + w * (out - out_u)
         x0, eps = to_x0_eps(cfg, out, x, a)
         x0 = jnp.clip(x0, -8.0, 8.0)
-        return jnp.sqrt(a_next) * x0 + jnp.sqrt(1 - a_next) * eps, None
+        sig = eta * jnp.sqrt((1 - a_next) / (1 - a) * (1 - a / a_next))
+        z = jax.random.normal(jax.random.fold_in(knoise, k), x.shape)
+        return jnp.sqrt(a_next) * x0 + jnp.sqrt(jnp.maximum(1 - a_next - sig ** 2, 0.0)) * eps + sig * z, None
 
     x, _ = jax.lax.scan(body, x, jnp.arange(S))
     return x

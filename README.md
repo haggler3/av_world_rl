@@ -210,9 +210,30 @@ it needs a GPU or a longer budget. The MLP trained for 3 min (12,900 steps) is t
 | roughness vs real trajectories | - | ~51x | **4.2x** |
 | 90 % band coverage (gap, 3 s) | - | 91 % | 84 % (somewhat over-confident) |
 
+**Architecture experiments (`python -m dwm.explore`, 60 s of training each on the 200k sample, 800 held-out windows; `results/dwm/explore/`):**
+
+| output representation | skill vs kinematic | gap CRPS 3 s | 90 % coverage | roughness vs real | best possible (projection floor) |
+|---|---|---|---|---|---|
+| control points, 10 per channel | 0.56 | 0.54 m | 81 % | 4.9x | 0.05 m |
+| **DCT, 8 cosines per channel** | **0.50** | **0.45 m** | 72 % | 2.3x | 0.30 m |
+| leader physics decoder (leader acceleration integrated into speed and gap), ridge encoder | 0.53 | 0.52 m | 52 % | **0.21x** | 0.34 m |
+| … same with a plain pseudo-inverse encoder | 2.10 | 8.0 m | 99 % | 81x | 0.18 m |
+
+What was learned:
+* **DCT is the best output basis at this budget**: most accurate and nearly as smooth as reality.
+* **The physics decoder needs a regularised encoder.** It is ill-conditioned (condition number 3e6): with a pseudo-inverse,
+  0.1 of latent noise became 55 m of gap error. With ridge 1e-4 that drops to 0.18 m (5x less than knots or DCT) and its
+  futures are the smoothest, but at 60 s it is the most over-confident.
+* **Did not help:** classifier-free guidance on the actions (1.0 / 1.5 / 2.5 all slightly worse), adding measurement noise
+  as an observation model (std-scaled: far worse; robust-scaled: no change), stochastic sampling (eta 0.5 / 1, 10 steps:
+  coverage unchanged, `sampler.txt`).
+* **Open:** the compact bases are over-confident at 60 s (52-81 % coverage for a 90 % band). The 30-step model reached 91 %
+  only after 22k steps, so the next test is a longer DCT run.
+
 ```bash
 python -m dwm.data data/city10.bin data/dwm      # windows from AV_TRANSITIONS logs
 python -m dwm.ablate --budget 90                  # equal-budget ablations
 python -m dwm.train --budget 450 --cfg '{"sample_steps": 5}' --out results/dwm/final
 python -m dwm.quick                               # small fast pass: compare, train 3 min, redraw the GIF
+python -m dwm.explore                             # 60 s architecture experiments (bases, guidance, observation noise)
 ```

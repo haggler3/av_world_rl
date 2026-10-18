@@ -65,7 +65,40 @@ def base_of(cfg: M.Cfg, d, idx=None):
 def make_cond(cfg: M.Cfg, st: Stats, hist, act):
     h = (hist - st.h_mu) / st.h_sd
     h = h[:, H - cfg.hist_len:].reshape(h.shape[0], -1)
-    return np.concatenate([h, act], 1).astype(np.float32) if cfg.use_actions else h.astype(np.float32)
+    if not cfg.use_actions:
+        return h.astype(np.float32)
+    parts = [h, act] + ([np.ones((len(h), 1))] if cfg.cond_drop > 0 else [])  # last column: "actions present"
+    return np.concatenate(parts, 1).astype(np.float32)
+
+
+def get_codec(cfg: M.Cfg, d, st: Stats):
+    """(Dec, Enc, z_sd) for the non-legacy bases; z_sd normalises the latent to unit scale."""
+    from . import basis as Bz
+
+    key = ("codec", cfg.basis, cfg.nb, cfg.target)
+    if key not in _CACHE:
+        Dec, Enc = Bz.codec(cfg.basis, cfg.nb, st.sd[cfg.target], SCALE)
+        tr = np.where(~d["test"])[0][:100_000]
+        r = ((d["fut"][tr] - base_of(cfg, d, tr)) / st.sd[cfg.target]).reshape(len(tr), -1)
+        z = r @ Enc.T
+        z_sd = z.std(0) + 1e-3
+        # what the basis cannot represent (tracker noise, leader switches): its spread per (step, channel)
+        res = (r - z @ Dec.T).reshape(len(tr), F, NC)
+        mad = 1.4826 * np.median(np.abs(res - np.median(res, 0)), 0)  # robust: leader switches make the std meaningless
+        _CACHE[("obs_sd",) + key[1:]] = mad.astype(np.float32)
+        _CACHE[key] = (Dec, Enc, z_sd.astype(np.float32))
+    return _CACHE[key]
+
+
+def with_latent(cfg: M.Cfg):
+    """Fill in the latent length for a basis config."""
+    import dataclasses
+
+    from . import basis as Bz
+
+    if cfg.basis == "legacy":
+        return cfg
+    return dataclasses.replace(cfg, lat=Bz.physical_decoder(cfg.basis, cfg.nb).shape[1])
 
 
 _CACHE = {}
@@ -74,10 +107,14 @@ _CACHE = {}
 def prepared(cfg: M.Cfg, d, st: Stats):
     """Training arrays on device, cached across runs that share the conditioning and the target."""
     tr = ~d["test"]
-    kc = (cfg.hist_len, cfg.use_actions)
+    kc = (cfg.hist_len, cfg.use_actions, cfg.cond_drop > 0)
     if kc not in _CACHE:
         _CACHE[kc] = jnp.asarray(make_cond(cfg, st, d["hist"][tr], d["act"][tr]))
-    kt = (cfg.target, cfg.knots)
+    kt = (cfg.target, cfg.knots, cfg.basis, cfg.nb)
+    if kt not in _CACHE and cfg.basis != "legacy":
+        Dec, Enc, z_sd = get_codec(cfg, d, st)
+        r = ((d["fut"][tr] - base_of(cfg, d, tr)) / st.sd[cfg.target]).reshape(int(tr.sum()), -1)
+        _CACHE[kt] = jnp.asarray(((r @ Enc.T) / z_sd)[..., None])
     if kt not in _CACHE:
         _, P = M.upsampler(cfg)
         _CACHE[kt] = jnp.asarray(np.einsum("lf,nfc->nlc", P, (d["fut"][tr] - base_of(cfg, d, tr)) / st.sd[cfg.target]))
@@ -163,16 +200,28 @@ def load_data(path):
     return d
 
 
-def sample_physical(res, cfg, st, d, idx, K, seed=0, steps=None):
+def decode(cfg, d, st, x):
+    """Model output [B, L, C'] -> normalised residual [B, F, C]."""
+    if cfg.basis == "legacy":
+        return np.einsum("fl,blc->bfc", M.upsampler(cfg)[0], x)
+    Dec, _, z_sd = get_codec(cfg, d, st)
+    return ((x[..., 0] * z_sd) @ Dec.T).reshape(len(x), F, NC)
+
+
+def sample_physical(res, cfg, st, d, idx, K, seed=0, steps=None, guidance=None, eta=None):
     cond = jnp.asarray(make_cond(cfg, st, d["hist"][idx], d["act"][idx]))
     ab = M.alphas_bar(cfg.T)
     N = cond.shape[0]
     cond_k = jnp.repeat(cond, K, 0)
-    fn = jax.jit(lambda p, c, k: M.sample(p, cfg, ab, c, k, steps))
+    fn = jax.jit(lambda p, c, k: M.sample(p, cfg, ab, c, k, steps, guidance, eta))
     t0 = time.time()
     x = np.asarray(jax.block_until_ready(fn(res["params"], cond_k, jax.random.PRNGKey(seed))))
     sample_s = time.time() - t0
-    x = np.einsum("fl,blc->bfc", M.upsampler(cfg)[0], x)
+    x = decode(cfg, d, st, x)
+    if cfg.obs_noise and cfg.basis != "legacy":
+        get_codec(cfg, d, st)
+        obs_sd = _CACHE[("obs_sd", cfg.basis, cfg.nb, cfg.target)]
+        x = x + obs_sd * np.random.default_rng(seed + 1).normal(size=x.shape).astype(np.float32)
     x = x.reshape(N, K, F, NC) * st.sd[cfg.target] + base_of(cfg, d, idx)[:, None]
     return x * SCALE, sample_s
 
