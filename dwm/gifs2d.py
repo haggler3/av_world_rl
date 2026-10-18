@@ -44,53 +44,58 @@ def scene_paths(res, cfg, st, d, i, K=16, interp=3):
 
 
 def render(frames, final, d, i, title, sub, out, fps=12):
+    """Top-down street with car sprites. Act 1: the imagined leaders settle on where the car ahead will be in 3 s (dashed
+    outline: where the AV will be). Act 2: the 3 s play out; pink = imagined leaders, silver = the real one."""
+    from . import cars2d as C
+
     real = d["fut"][i] * T.SCALE
     cur = d["cur"][i] * T.SCALE
     light = int(np.argmax(d["hist"][i][-1, 4:7]))
+    travel = cur[1] - real[:, 1]  # how far the AV has driven at each future step
+    line_x = cur[1]
     plan = [("imagine", k) for k in range(len(frames))] + [("imagine", len(frames) - 1)] * 6 + [("play", k) for k in range(F)] + [("play", F - 1)] * 8
-    fig, ax = plt.subplots(figsize=(6.4, 2.5), facecolor=BG)
-    fig.subplots_adjust(left=0.02, right=0.98, top=0.74, bottom=0.17)
-
-    def car(x, y, color, fill=True, alpha=1.0, lw=1.6):
-        ax.add_patch(plt.Rectangle((x, y - 0.95), 4.6, 1.9, color=color if fill else None, fill=fill, ec=color, lw=lw, alpha=alpha))
+    x_hi = max(travel[-1] + np.percentile(final[:, :, 3], 90) + 10, cur[3] + 12)  # frame the cars, not the whole street
+    if line_x < x_hi + 15:
+        x_hi = max(x_hi, line_x + 14)  # show the intersection when it is close
+    x_lo = -9
+    fig, ax = plt.subplots(figsize=(9.0, 3.3), facecolor=BG)
+    fig.subplots_adjust(0, 0, 1, 0.8)
 
     def draw(n):
         act, k = plan[n]
         ax.cla()
         ax.set_facecolor(BG)
-        ax.set_xlim(-8, 62)
-        ax.set_ylim(-4.2, 4.2)
+        ax.set_xlim(x_lo, x_hi)
+        ax.set_ylim(-8.5, 8.5)
+        ax.set_aspect("equal")
         ax.axis("off")
-        ax.add_patch(plt.Rectangle((-8, -3.6), 70, 7.2, color=ROAD))
-        ax.plot([-8, 62], [0, 0], color=LANE, lw=1, ls=(0, (5, 5)))
-        for y in (-3.6, 3.6):
-            ax.plot([-8, 62], [y, y], color=LANE, lw=1.2)
+        C.street(ax, x_lo - 5, x_hi + 5, line_x, light)
         if act == "imagine":
-            gaps, gr, dl, t = frames[k][:, -1, 3], cur[3], cur[1], 0.0
-            label = "imagining where the car ahead will be in 3 s" if k < len(frames) - 1 else "16 futures imagined; now play them out"
-            v_av, v_lead = cur[0], cur[4]
+            ghosts = travel[-1] + frames[k][:, -1, 3]
+            av, lead = 0.0, cur[3]
+            C.car(ax, travel[-1] - 4.6, -1.8, "#2f81f7", alpha=0.25, z=4)  # where the AV will be in 3 s
+            label = "imagining where the car ahead will be in 3 s" if k < len(frames) - 1 else "16 futures imagined - now let them play out"
+            v_av, v_lead, tt = cur[0], cur[4], 0.0
         else:
-            gaps, gr, dl, t = final[:, k, 3], real[k, 3], real[k, 1], (k + 1) * 0.1
-            label = f"t = {t:.1f} s   ·   pink: imagined leaders   ·   white: the real one"
-            v_av, v_lead = real[k, 0], real[k, 4]
-        if -8 < dl < 62:
-            ax.plot([dl, dl], [-3.6, 0], color=LIGHT[light], lw=4)
-        for g in gaps:
-            car(g, -1.8, GHOST, alpha=0.16)
-        car(gr, -1.8, REAL, fill=False)
-        car(-4.6, -1.8, EGO)
-        ax.text(-7.5, 2.0, f"AV {v_av * 3.6:4.1f} km/h", color=EGO, fontsize=8)
-        ax.text(gr, 2.0, f"leader {v_lead * 3.6:4.1f} km/h", color=REAL, fontsize=8)
-        ax.text(-7.5, -4.15, label, color=LANE, fontsize=7.5)
+            ghosts = travel[k] + final[:, k, 3]
+            av, lead = travel[k], travel[k] + real[k, 3]
+            label = "pink: imagined leaders   silver: the real one   blue: the AV"
+            v_av, v_lead, tt = real[k, 0], real[k, 4], (k + 1) * 0.1
+        for g in ghosts:
+            C.car(ax, g, -1.8, "#f778ba", alpha=0.17, z=4)
+        C.car(ax, lead if act == "play" else cur[3], -1.8, "#c9d1d9", outline="white", z=8)
+        C.car(ax, av - 4.6, -1.8, "#2f81f7", z=8)
+        ax.text(x_lo + 1, 6.9, f"t = {tt:.1f} s    AV {v_av * 3.6:4.1f} km/h    leader {v_lead * 3.6:4.1f} km/h", color=TXT, fontsize=8.5, zorder=10)
+        ax.text(x_lo + 1, -8.1, label, color=LANE, fontsize=8, zorder=10)
         return []
 
-    fig.text(0.02, 0.9, title, color=TXT, fontsize=11, weight="bold")
-    fig.text(0.02, 0.8, sub, color=LANE, fontsize=8)
-    FuncAnimation(fig, draw, frames=len(plan)).save(out, writer=PillowWriter(fps=fps), dpi=80, savefig_kwargs={"facecolor": BG})
+    fig.text(0.015, 0.92, title, color=TXT, fontsize=11.5, weight="bold")
+    fig.text(0.015, 0.845, sub, color=LANE, fontsize=7.6)
+    FuncAnimation(fig, draw, frames=len(plan)).save(out, writer=PillowWriter(fps=fps), dpi=85, savefig_kwargs={"facecolor": BG})
     plt.close(fig)
 
 
-def main(budget=60, out="results/dwm/gifs2d"):
+def main(budget=60, out="results/dwm/gifs2d", render_gifs=True, max_steps=None):
     t0 = time.time()
     os.makedirs(out, exist_ok=True)
     d = small_data()
@@ -101,7 +106,7 @@ def main(budget=60, out="results/dwm/gifs2d"):
     rows = []
     for key, title, over in VARIANTS:
         cfg = T.with_latent(M.Cfg(**over))
-        r = T.train(cfg, d, st, budget, verbose=False)
+        r = T.train(cfg, d, st, 1e9 if max_steps else budget, verbose=False, max_steps=max_steps)  # max_steps: equal training on any machine
         pred, ss = T.sample_physical(r, cfg, st, d, idx, 8)
         m = T.metrics(pred, d, idx)
         row = {"variant": title, "steps": r["steps"], "skill_vs_kinematic": round(T.skill(m, ref), 3), "crps_gap_3s": round(m["crps_gap_3s"], 3),
@@ -109,6 +114,12 @@ def main(budget=60, out="results/dwm/gifs2d"):
                "roughness_vs_real": round(m["roughness_gap_vs_real"], 2), "sample_ms_per_future": round(1000 * ss / (len(idx) * 8), 3)}
         rows.append(row)
         print(json.dumps(row), flush=True)
+        import pickle
+
+        with open(os.path.join(out, f"{key}.pkl"), "wb") as f:
+            pickle.dump({"params": jax.tree.map(np.asarray, r["params"]), "cfg": cfg, "stats": st.__dict__}, f)
+        if not render_gifs:
+            continue
         frames, final = scene_paths(r, cfg, st, d, scene)
         sub = f"score vs physics {row['skill_vs_kinematic']:.2f} (lower is better) · gap error 3 s {row['crps_gap_3s']:.2f} m · 90% band holds {100 * row['coverage90_gap_3s']:.0f}% · roughness {row['roughness_vs_real']:.1f}x real"
         render(frames, final, d, scene, title, sub, f"docs/img/dwm_{key}.gif")

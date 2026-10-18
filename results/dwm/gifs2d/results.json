@@ -1,42 +1,42 @@
 [
  {
   "variant": "diffusion \u00b7 10 control points",
-  "steps": 3700,
-  "skill_vs_kinematic": 0.563,
-  "crps_gap_3s": 0.581,
-  "crps_lead_v_3s": 0.281,
-  "coverage90_gap_3s": 0.782,
-  "roughness_vs_real": 5.03,
-  "sample_ms_per_future": 0.198
+  "steps": 4000,
+  "skill_vs_kinematic": 0.545,
+  "crps_gap_3s": 0.532,
+  "crps_lead_v_3s": 0.273,
+  "coverage90_gap_3s": 0.774,
+  "roughness_vs_real": 4.86,
+  "sample_ms_per_future": 0.113
  },
  {
   "variant": "diffusion \u00b7 DCT basis",
-  "steps": 4100,
-  "skill_vs_kinematic": 0.531,
-  "crps_gap_3s": 0.464,
-  "crps_lead_v_3s": 0.251,
-  "coverage90_gap_3s": 0.736,
-  "roughness_vs_real": 2.33,
-  "sample_ms_per_future": 0.177
+  "steps": 4000,
+  "skill_vs_kinematic": 0.529,
+  "crps_gap_3s": 0.466,
+  "crps_lead_v_3s": 0.252,
+  "coverage90_gap_3s": 0.744,
+  "roughness_vs_real": 2.37,
+  "sample_ms_per_future": 0.105
  },
  {
   "variant": "diffusion \u00b7 leader physics decoder",
-  "steps": 4100,
-  "skill_vs_kinematic": 0.536,
-  "crps_gap_3s": 0.55,
-  "crps_lead_v_3s": 0.291,
-  "coverage90_gap_3s": 0.487,
+  "steps": 4000,
+  "skill_vs_kinematic": 0.544,
+  "crps_gap_3s": 0.56,
+  "crps_lead_v_3s": 0.295,
+  "coverage90_gap_3s": 0.5,
   "roughness_vs_real": 0.21,
-  "sample_ms_per_future": 0.231
+  "sample_ms_per_future": 0.143
  },
  {
   "variant": "flow matching \u00b7 DCT basis",
-  "steps": 4500,
-  "skill_vs_kinematic": 0.453,
-  "crps_gap_3s": 0.452,
-  "crps_lead_v_3s": 0.237,
-  "coverage90_gap_3s": 0.744,
-  "roughness_vs_real": 3.15,
-  "sample_ms_per_future": 0.202
+  "steps": 4000,
+  "skill_vs_kinematic": 0.477,
+  "crps_gap_3s": 0.468,
+  "crps_lead_v_3s": 0.242,
+  "coverage90_gap_3s": 0.726,
+  "roughness_vs_real": 3.31,
+  "sample_ms_per_future": 0.183
  }
 ]

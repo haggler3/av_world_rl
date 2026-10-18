@@ -1,0 +1,152 @@
+[
+ {
+  "benchmark driver": "planner",
+  "model": "constant velocity",
+  "skill_vs_kinematic": 15.923,
+  "crps_speed_3s": 2.17,
+  "crps_gap_1s": 0.458,
+  "crps_gap_3s": 2.306,
+  "crps_lead_v_3s": 0.877,
+  "roughness_vs_real": 0.0
+ },
+ {
+  "benchmark driver": "planner",
+  "model": "kinematic",
+  "skill_vs_kinematic": 1.0,
+  "crps_speed_3s": 0.08,
+  "crps_gap_1s": 0.355,
+  "crps_gap_3s": 1.697,
+  "crps_lead_v_3s": 0.877,
+  "roughness_vs_real": 0.332
+ },
+ {
+  "benchmark driver": "planner",
+  "model": "diffusion \u00b7 30 steps (full data, 7.5 min)",
+  "skill_vs_kinematic": 2.83,
+  "crps_speed_3s": 0.124,
+  "crps_gap_1s": 1.98,
+  "crps_gap_3s": 5.408,
+  "crps_lead_v_3s": 1.037,
+  "coverage90_gap_3s": 0.309,
+  "roughness_vs_real": 79.806
+ },
+ {
+  "benchmark driver": "planner",
+  "model": "diffusion \u00b7 10 control points",
+  "skill_vs_kinematic": 1.882,
+  "crps_speed_3s": 0.108,
+  "crps_gap_1s": 0.999,
+  "crps_gap_3s": 3.737,
+  "crps_lead_v_3s": 0.877,
+  "coverage90_gap_3s": 0.524,
+  "roughness_vs_real": 9.256
+ },
+ {
+  "benchmark driver": "planner",
+  "model": "diffusion \u00b7 DCT basis",
+  "skill_vs_kinematic": 1.854,
+  "crps_speed_3s": 0.108,
+  "crps_gap_1s": 1.143,
+  "crps_gap_3s": 3.083,
+  "crps_lead_v_3s": 0.864,
+  "coverage90_gap_3s": 0.531,
+  "roughness_vs_real": 6.868
+ },
+ {
+  "benchmark driver": "planner",
+  "model": "diffusion \u00b7 leader physics decoder",
+  "skill_vs_kinematic": 1.06,
+  "crps_speed_3s": 0.099,
+  "crps_gap_1s": 0.303,
+  "crps_gap_3s": 1.453,
+  "crps_lead_v_3s": 0.75,
+  "coverage90_gap_3s": 0.417,
+  "roughness_vs_real": 0.404
+ },
+ {
+  "benchmark driver": "planner",
+  "model": "flow matching \u00b7 DCT basis",
+  "skill_vs_kinematic": 2.136,
+  "crps_speed_3s": 0.124,
+  "crps_gap_1s": 1.243,
+  "crps_gap_3s": 3.347,
+  "crps_lead_v_3s": 0.839,
+  "coverage90_gap_3s": 0.558,
+  "roughness_vs_real": 9.453
+ },
+ {
+  "benchmark driver": "learned",
+  "model": "constant velocity",
+  "skill_vs_kinematic": 26.59,
+  "crps_speed_3s": 1.245,
+  "crps_gap_1s": 0.323,
+  "crps_gap_3s": 1.691,
+  "crps_lead_v_3s": 1.048,
+  "roughness_vs_real": 0.0
+ },
+ {
+  "benchmark driver": "learned",
+  "model": "kinematic",
+  "skill_vs_kinematic": 1.0,
+  "crps_speed_3s": 0.035,
+  "crps_gap_1s": 0.391,
+  "crps_gap_3s": 1.976,
+  "crps_lead_v_3s": 1.048,
+  "roughness_vs_real": 0.217
+ },
+ {
+  "benchmark driver": "learned",
+  "model": "diffusion \u00b7 30 steps (full data, 7.5 min)",
+  "skill_vs_kinematic": 0.316,
+  "crps_speed_3s": 0.01,
+  "crps_gap_1s": 0.129,
+  "crps_gap_3s": 0.341,
+  "crps_lead_v_3s": 0.197,
+  "coverage90_gap_3s": 0.886,
+  "roughness_vs_real": 29.429
+ },
+ {
+  "benchmark driver": "learned",
+  "model": "diffusion \u00b7 10 control points",
+  "skill_vs_kinematic": 0.419,
+  "crps_speed_3s": 0.013,
+  "crps_gap_1s": 0.196,
+  "crps_gap_3s": 0.504,
+  "crps_lead_v_3s": 0.248,
+  "coverage90_gap_3s": 0.867,
+  "roughness_vs_real": 4.968
+ },
+ {
+  "benchmark driver": "learned",
+  "model": "diffusion \u00b7 DCT basis",
+  "skill_vs_kinematic": 0.434,
+  "crps_speed_3s": 0.011,
+  "crps_gap_1s": 0.233,
+  "crps_gap_3s": 0.467,
+  "crps_lead_v_3s": 0.236,
+  "coverage90_gap_3s": 0.815,
+  "roughness_vs_real": 2.411
+ },
+ {
+  "benchmark driver": "learned",
+  "model": "diffusion \u00b7 leader physics decoder",
+  "skill_vs_kinematic": 0.442,
+  "crps_speed_3s": 0.014,
+  "crps_gap_1s": 0.201,
+  "crps_gap_3s": 0.58,
+  "crps_lead_v_3s": 0.277,
+  "coverage90_gap_3s": 0.567,
+  "roughness_vs_real": 0.221
+ },
+ {
+  "benchmark driver": "learned",
+  "model": "flow matching \u00b7 DCT basis",
+  "skill_vs_kinematic": 0.375,
+  "crps_speed_3s": 0.009,
+  "crps_gap_1s": 0.228,
+  "crps_gap_3s": 0.438,
+  "crps_lead_v_3s": 0.221,
+  "coverage90_gap_3s": 0.846,
+  "roughness_vs_real": 3.305
+ }
+]

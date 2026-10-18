@@ -241,14 +241,39 @@ sampled with 10 Euler steps.
 | diffusion, leader physics decoder | 0.54 | 0.55 m | 0.29 m/s | 49 % | 0.21x |
 | **flow matching, DCT** | **0.45** | **0.45 m** | **0.24 m/s** | 74 % | 3.2x |
 
-At this budget flow matching is the best model so far: same network, same data, 15 % better skill than diffusion with the
-same basis. All four are still over-confident (49-78 % coverage for a 90 % band). Same held-out scene, top-down (blue: the
-AV, pink: 16 imagined leaders, white: the real one):
+At this budget flow matching is the best model so far: same network, same data, better skill than diffusion with the
+same basis (0.48 vs 0.53 at an equal 4,000 steps).
+
+**On the original `small_av_world` benchmark** (`python -m dwm.benchmark`): the 64 trips of `av_world trips --seeds 8`
+(4 routes x 2 peaks x 8 seeds), logged once with the learned driver and once with the **original planner stack** driving.
+The world models were trained only on a 10 % fleet run with the learned driver, so the planner-driven trips test whether
+they generalise to a different driving style. Skill vs the kinematic baseline (lower is better; < 1 beats physics):
+
+| model | trips, learned driver: skill / gap CRPS 3 s / 90 % coverage | trips, planner stack: skill / gap CRPS 3 s / 90 % coverage |
+|---|---|---|
+| kinematic (physics) | 1.00 / 1.98 m / - | 1.00 / 1.70 m / - |
+| diffusion, 30 steps (full data, 7.5 min) | **0.32** / **0.34 m** / 89 % | 2.83 / 5.41 m / 31 % |
+| diffusion, 10 control points (4k steps) | 0.42 / 0.50 m / 87 % | 1.88 / 3.74 m / 52 % |
+| diffusion, DCT (4k steps) | 0.43 / 0.47 m / 82 % | 1.85 / 3.08 m / 53 % |
+| diffusion, leader physics decoder (4k steps) | 0.44 / 0.58 m / 57 % | **1.06** / **1.45 m** / 42 % |
+| flow matching, DCT (4k steps) | 0.38 / 0.44 m / 85 % | 2.14 / 3.35 m / 56 % |
+
+* **Same driver, new trips:** every world model beats physics, by 2-3x on the gap 3 s ahead; the bigger diffusion model is best,
+  flow matching is best among the 4k-step models, and coverage is close to nominal here (82-89 %).
+* **Different driver (the planner stack):** all purely learned models are *worse than physics* (1.9-2.8x) and over-confident.
+  A world model trained on one policy's data does not transfer to another policy: the planner keeps different gaps, brakes
+  harder and stops elsewhere, so the history it sees is out of distribution. Only the **leader physics decoder** holds up
+  (1.06, at parity with physics, best gap error), because its structure (gap and leader speed integrate one leader
+  acceleration) constrains what it can imagine. The fix is data from several driving policies (planner, learned, human-like).
+
+Top-down on a benchmark scene (blue: the AV; pink: 16 imagined leaders; silver: the real car ahead; the AV approaches a red light):
 
 | | |
 |---|---|
 | ![control points](docs/img/dwm_control_points.gif) | ![DCT](docs/img/dwm_dct.gif) |
 | ![leader physics](docs/img/dwm_leader_physics.gif) | ![flow matching](docs/img/dwm_flow_dct.gif) |
+
+Pipeline and math for everything here (PPO, the envelope, diffusion, flow matching, the bases, CRPS): [`docs/METHODS.md`](docs/METHODS.md).
 
 ```bash
 python -m dwm.data data/city10.bin data/dwm      # windows from AV_TRANSITIONS logs
@@ -256,5 +281,6 @@ python -m dwm.ablate --budget 90                  # equal-budget ablations
 python -m dwm.train --budget 450 --cfg '{"sample_steps": 5}' --out results/dwm/final
 python -m dwm.quick                               # small fast pass: compare, train 3 min, redraw the GIF
 python -m dwm.explore                             # 60 s architecture experiments (bases, guidance, observation noise)
-python -m dwm.gifs2d                              # diffusion bases vs flow matching, one 2D GIF each
+python -m dwm.gifs2d                              # diffusion bases vs flow matching (add max_steps for equal training)
+python -m dwm.benchmark                           # world models on the 64-trip benchmark, planner and learned driver; 2D car GIFs
 ```
