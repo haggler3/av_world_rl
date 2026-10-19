@@ -8,12 +8,108 @@ Learning on top of [`small_av_world`](https://github.com/haggler3/small_av_world
 2. **Generative world models.** Diffusion and flow-matching models that sample possible 3 s futures of the traffic around an
    AV, trained on transitions logged in the city (`dwm/`).
 
-The intersection simulator with turn lanes, risky human drivers and calibrated crash rates is in its own repo:
-[`av_world`](https://github.com/haggler3/av_world).
+3. **A city-area driver (new).** Multi-agent PPO in [`av_world`](https://github.com/haggler3/av_world)'s `xnet`, a whole
+   simulated map area (Oakland, Pittsburgh). One shared policy drives every AV among human drivers, pedestrians,
+   buses, signals and stop signs. A world model is trained on the same simulator.
+
+The intersection and area simulators (turn lanes, risky human drivers, calibrated crash rates, OpenStreetMap areas) are
+in their own repo, [`av_world`](https://github.com/haggler3/av_world).
+
+## The city-area driver (`avrl/xppo.py`)
+
+![learned AVs in Oakland](docs/img/xnet_learned_avs.gif)
+
+**What changed from the corridor driver:**
+
+- **Environment.** The corridor env was a JAX copy of one road segment of `small_av_world`. Here the environment is the
+  whole area: 313 junctions, signals and stop signs, right of way at every conflict point, lane changes, pedestrians,
+  buses and double-parked vans. The humans around the AVs react to them.
+- **Multi-agent, parameter-shared.** Every AV in 8 copies of the area is driven by the same policy. One simulator step
+  gives about 1,000 transitions (the corridor env gave one per environment), about 23,000 transitions per second on
+  4 CPU cores. GAE runs per vehicle slot with masks, and trips that end or crash cut the return.
+- **Two actions.**
+  - An acceleration command, capped by the same classical safety envelope as before: IDM bounds toward the stop target
+    and the leader, plus the speed limit.
+  - A gap-acceptance scale for the next junction (0.8-1.5x the human critical gaps), so the policy learns how
+    cautiously to turn across or merge into traffic. The rule-based AV uses 1.25.
+- **Richer observation (28 features).** Includes the stop target, whatever caused it (signal, stop sign, yielding,
+  crosswalk, full exit), the earliest arrival on a movement with priority, turn speed caps and the wrong-lane flag.
+- **Domain randomisation per copy:** AV share (15 / 40 / 100 %), demand (0.8-1.3x) and human risk (calibrated x1 / 5 / 15).
+- **Training.** First behaviour cloning of the rule-based AV (60 rollouts, 2 min), then PPO. Each update (rollout of
+  all copies, GAE, 4 epochs) is one jitted function of about 1.8 s. Copies are restarted in turn so jams never stick.
+
+**Two reward problems found on the way:**
+
+- **The first policy learned to crawl** (AV speed 5.7 -> 3 km/h). Hard-braking, headway and speeding penalties only
+  apply when moving, so standing still was the cheapest. Fixed with an idle penalty (as in the corridor env), a larger
+  progress reward and a small team term (the area's mean speed).
+- **The next one cruised at 70 % of the desired speed on free road.** Under exploration noise, speed means more hard
+  braking later. Fine-tuning with progress at 0.04/m fixed it.
+
+![training](docs/img/xnet_training.png)
+
+*Training statistics include exploration noise. The reward jump at the dashed line is the reward change, not a jump in
+skill.*
+
+**Results** (`python -m avrl.xeval`): deterministic policy, 8 copies x 30 simulated minutes, same seeds, humans with the
+calibrated risky behaviour:
+
+| | trips | mean speed | AV trip | human trip | AV hard brakes /h | AV jerk RMS | AV near misses | AV crashes |
+|---|---|---|---|---|---|---|---|---|
+| humans only | 18,574 | 12.2 km/h | - | 6.41 min | - | - | - | - |
+| 25 % AVs, rule-based | 18,402 | 12.2 | 6.22 min | 6.58 min | 13.3 | 2.43 | 8 | 2 |
+| **25 % AVs, learned** | 18,134 | 12.0 | **6.16 min** | 6.59 min | **2.5** | **1.66** | 2 | 4 |
+| 100 % AVs, rule-based | 18,200 | 12.0 | 6.30 min | (humans: none) | 12.7 | 2.43 | 15 | 12 |
+| **100 % AVs, learned** | 18,203 | **12.4** | 6.35 min | | **2.3** | **1.66** | 24 | 10 |
+| 25 % rule-based, humans x10 riskier | 18,457 | 12.2 | 6.24 min | 6.55 min | 13.3 | 2.42 | 6 | 2 |
+| 25 % learned, humans x10 riskier | 18,458 | 12.3 | 6.26 min | 6.54 min | 2.5 | 1.67 | 8 | 3 |
+
+**What this shows:**
+
+- **Smoothness:** the learned driver brakes hard about 5x less often and its jerk is about 30 % lower.
+- **Speed:** it is as fast as the rule-based AV (AV trips within 1 %), and with 100 % AVs the whole area is slightly
+  faster (12.4 against 12.0 km/h).
+- **Safety: no evidence of a difference either way.** No AV ran a red light. Crash and near-miss counts are small
+  (2-24) and go both ways. Many of the crashes are the area simulator's own residual crashes (see `av_world`), so they
+  cannot separate the two drivers.
+- **Shield:** the envelope changes 2 % of the decisions.
+
+The policy uses the new 28-feature observation, so it does not run in the Rust `small_av_world` stack (that needs the
+corridor driver below).
+
+**World model on the same simulator** (`dwm/xnet_data.py`, `DWM_SOURCE=xnet`):
+
+- **Data:** 2.8 M AV decisions logged from 15 simulated minutes of 4 copies, driven by a learned-policy checkpoint
+  (`results/xnet2`) with its exploration noise. That gives 920 k windows of 1 s history and 3 s future at 5 Hz.
+- **Models:** the same diffusion models as `dwm/`, unchanged; the data spec is switchable.
+- **Results** (skill = error relative to the kinematic model, lower is better):
+
+| | skill | gap CRPS at 3 s | 90 % coverage of the gap | roughness vs real | sampling |
+|---|---|---|---|---|---|
+| kinematic (physics) | 1.0 | 1.84 m | - | - | - |
+| diffusion, per-step output (4 min) | **0.70** | 1.73 m | 92 % | 21x | 0.09 ms / future |
+| diffusion, DCT basis (3 min) | 0.72 | **1.48 m** | 85 % | **2.6x** | **0.06 ms / future** |
+
+The DCT model is the one to use: as accurate, with far smoother futures, and faster to sample. Against physics it is a
+smaller gain than in `small_av_world` (0.72 against 0.32). Here the leaders are signal- and right-of-way-driven traffic
+through junctions, not one segment's queue.
+
+```bash
+pip install -e ../av_world && (cd ../av_world && python -m pgh.fetch)     # the area simulator and its map data
+python -m avrl.xppo --out results/xnet --updates 250                        # BC + PPO (~9 min on 4 CPU cores)
+python -m avrl.xppo --out results/xnet3 --updates 200 --init results/xnet/policy.npz --reward '{"progress": 0.04}'
+python -m avrl.xeval results/xnet3/policy.npz                               # the table above (~7 min)
+python -m avrl.xviz                                                         # training curves, street-view GIF
+python -m dwm.xnet_data results/xnet3/policy.npz                            # world-model data (the run above used results/xnet2)
+DWM_SOURCE=xnet python -m dwm.train --data data/dwm_xnet --budget 180 --out results/dwm/xnet_dct \
+    --cfg '{"basis": "dct", "nb": 6, "sample_steps": 5}'
+```
+
+## The corridor driver and the city world models (`small_av_world`)
 
 ![the learned driver vs a rule-based driver](docs/img/compare.gif)
 
-## Headline results
+### Headline results
 
 **Learned driver in the city** (Rust, against the original planner stack):
 
@@ -98,8 +194,10 @@ What the experiments showed (all tables in [`docs/WORLD_MODELS.md`](docs/WORLD_M
 
 ```
 avrl/       driving env, PPO, baselines, evaluation, visuals, export, one-step world model
-dwm/        diffusion / flow world models: data, model, bases, training, ablations, benchmark, GIFs
-tests/      env rules and physics, determinism, safety envelope, PPO update
-results/    final/ (the shipped policy), dwm/ (world-model results and weights), wm/
+avrl/xppo.py, xeval.py, xviz.py   the city-area driver: multi-agent PPO in av_world's xnet, evaluation, figures
+dwm/        diffusion / flow world models: data (DWM_SOURCE=city | xnet), model, bases, training, ablations, benchmark, GIFs
+dwm/xnet_data.py   world-model data logged from the area simulator
+tests/      env rules and physics, determinism, safety envelope, PPO update; xnet RL hook, shield, multi-agent PPO
+results/    final/ (the corridor policy), xnet/ xnet2/ xnet3/ (area policies; xnet3 is the final one), dwm/ (world models, incl. xnet/ and xnet_dct/), wm/
 docs/       METHODS.md, HISTORY.md, WORLD_MODELS.md, img/
 ```

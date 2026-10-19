@@ -1,0 +1,93 @@
+Cfg(kind='diffusion', target='residual', net='mlp', heads=4, pred='v', width=256, depth=3, T=100, sample_steps=10, use_actions=True, hist_len=5, knots=0, basis='legacy', nb=10, lat=0, cond_drop=0.0, guidance=1.0, eta=0.0, obs_noise=False, ema=0.999, lr=0.001, batch=512, seed=0, extra={})
+  step    100     2.8s  loss 0.6749
+  step    600     9.6s  loss 0.2708
+  step   1100    16.3s  loss 0.2336
+  step   1600    22.9s  loss 0.2104
+  step   2100    29.5s  loss 0.2024
+  step   2600    35.8s  loss 0.1837
+  step   3100    42.2s  loss 0.1695
+  step   3600    48.8s  loss 0.1635
+  step   4100    55.5s  loss 0.1695
+  step   4600    61.9s  loss 0.1621
+  step   5100    68.8s  loss 0.1645
+  step   5600    75.5s  loss 0.1512
+  step   6100    82.1s  loss 0.1482
+  step   6600    88.8s  loss 0.1394
+  step   7100    95.3s  loss 0.1354
+  step   7600   101.6s  loss 0.1342
+  step   8100   108.2s  loss 0.1283
+  step   8600   114.9s  loss 0.1236
+  step   9100   121.6s  loss 0.1222
+  step   9600   128.3s  loss 0.1225
+  step  10100   134.9s  loss 0.1218
+  step  10600   141.4s  loss 0.1205
+  step  11100   148.1s  loss 0.1169
+  step  11600   154.5s  loss 0.1159
+  step  12100   161.1s  loss 0.1097
+  step  12600   167.6s  loss 0.1147
+  step  13100   174.4s  loss 0.1076
+  step  13600   181.2s  loss 0.1065
+  step  14100   187.7s  loss 0.1093
+  step  14600   194.2s  loss 0.1005
+  step  15100   200.6s  loss 0.1048
+  step  15600   207.0s  loss 0.1048
+  step  16100   213.7s  loss 0.1011
+  step  16600   220.1s  loss 0.1004
+  step  17100   226.7s  loss 0.1025
+  step  17600   233.3s  loss 0.1020
+  step  18100   239.9s  loss 0.1003
+{
+ "cfg": {
+  "kind": "diffusion",
+  "target": "residual",
+  "net": "mlp",
+  "heads": 4,
+  "pred": "v",
+  "width": 256,
+  "depth": 3,
+  "T": 100,
+  "sample_steps": 10,
+  "use_actions": true,
+  "hist_len": 5,
+  "knots": 0,
+  "basis": "legacy",
+  "nb": 10,
+  "lat": 0,
+  "cond_drop": 0.0,
+  "guidance": 1.0,
+  "eta": 0.0,
+  "obs_noise": false,
+  "ema": 0.999,
+  "lr": 0.001,
+  "batch": 512,
+  "seed": 0,
+  "extra": null
+ },
+ "steps": 18200,
+ "train_s": 241.2,
+ "n_params": 1040474,
+ "sample_ms_per_future": 0.0889,
+ "model": {
+  "crps_speed_1s": 0.006155268754810095,
+  "crps_speed_2s": 0.01036278996616602,
+  "crps_speed_3s": 0.015656577423214912,
+  "crps_gap_1s": 0.41538453102111816,
+  "crps_gap_2s": 0.9954993724822998,
+  "crps_gap_3s": 1.730029582977295,
+  "crps_lead_v_1s": 0.14388924837112427,
+  "crps_lead_v_2s": 0.2518925070762634,
+  "crps_lead_v_3s": 0.35717248916625977,
+  "crps_d_line_1s": 5.99345588684082,
+  "crps_d_line_2s": 8.419588088989258,
+  "crps_d_line_3s": 13.985198020935059,
+  "coverage90_speed_3s": 0.9493333333333334,
+  "mae_mean_speed_3s": 0.022536391392350197,
+  "coverage90_gap_3s": 0.916327716443928,
+  "mae_mean_gap_3s": 3.076939105987549,
+  "roughness_gap_vs_real": 20.88381004333496,
+  "acc_lead_seen_3s": 0.9526666666666667,
+  "acc_must_stop_3s": 0.9363333333333334
+ },
+ "skill_vs_kinematic": 0.7008329743830647,
+ "total_wall_s": 268.5
+}

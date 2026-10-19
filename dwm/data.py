@@ -8,11 +8,22 @@ import os
 
 import numpy as np
 
-OBS_DIM = 22
+SOURCE = os.environ.get("DWM_SOURCE", "city")  # "city": small_av_world logs (10 Hz) | "xnet": av_world's area simulator (5 Hz)
+if SOURCE == "xnet":
+    OBS_DIM = 28  # xnet.sim.OBS_DIM
+    DT = 0.2
+    H, F = 5, 15  # 1 s of history, 3 s of future at 5 Hz
+    # speed, distance to the stop target, leader seen, gap, leader speed, stop required (xnet observation indices)
+    CHANNELS = [(0, "speed", 15.0), (7, "d_line", 100.0), (8, "lead_seen", 1.0), (9, "gap", 50.0), (10, "lead_v", 15.0), (6, "must_stop", 1.0)]
+    LAG = False  # xnet applies the acceleration directly
+else:
+    OBS_DIM = 22
+    DT = 0.1
+    H, F = 10, 30  # 1 s of history, 3 s of future at 10 Hz
+    # predicted channels: (feature index, name, physical scale of the feature)
+    CHANNELS = [(0, "speed", 15.0), (3, "d_line", 100.0), (10, "lead_seen", 1.0), (11, "gap", 50.0), (12, "lead_v", 15.0), (9, "must_stop", 1.0)]
+    LAG = True  # the Rust vehicle model: 0.25 s actuator lag
 ROW = OBS_DIM + 4  # [vehicle id, t, segment, obs.., u]  (small_av_world AV_TRANSITIONS format)
-H, F = 10, 30  # 1 s of history, 3 s of future at 10 Hz
-# predicted channels: (feature index, name, physical scale of the feature)
-CHANNELS = [(0, "speed", 15.0), (3, "d_line", 100.0), (10, "lead_seen", 1.0), (11, "gap", 50.0), (12, "lead_v", 15.0), (9, "must_stop", 1.0)]
 CH = np.array([c[0] for c in CHANNELS])
 NC = len(CHANNELS)
 
@@ -22,10 +33,10 @@ def load_rows(path):
 
 
 def windows(rows, stride=3):
-    """Index arrays of valid windows: H + F consecutive 0.1 s decisions of one vehicle on one segment."""
+    """Index arrays of valid windows: H + F consecutive decisions (DT apart) of one vehicle on one segment."""
     rows = rows[np.lexsort((rows[:, 1], rows[:, 0]))]
     L = H + F
-    same = (rows[1:, 0] == rows[:-1, 0]) & (rows[1:, 2] == rows[:-1, 2]) & (np.abs(rows[1:, 1] - rows[:-1, 1] - 0.1) < 0.02)
+    same = (rows[1:, 0] == rows[:-1, 0]) & (rows[1:, 2] == rows[:-1, 2]) & (np.abs(rows[1:, 1] - rows[:-1, 1] - DT) < 0.02)
     # run length of consecutive "same" links ending at each row
     ok = np.concatenate([[0], same.astype(np.int32)])
     run = np.zeros(len(rows), np.int32)

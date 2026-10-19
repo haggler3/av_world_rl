@@ -13,9 +13,8 @@ model's normalised space, so "smooth" means smooth in the real world:
 """
 import numpy as np
 
-from .data import F, NC
+from .data import DT, F, NC
 
-DT = 0.1
 
 
 def knots_matrix(n):

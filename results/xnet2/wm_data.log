@@ -1,0 +1,19 @@
+chunk 0: 94332 rows, 420 vehicles, 4 s
+chunk 1: 201465 rows, 496 vehicles, 5 s
+chunk 2: 319173 rows, 562 vehicles, 5 s
+chunk 3: 448522 rows, 643 vehicles, 6 s
+chunk 4: 581606 rows, 712 vehicles, 7 s
+chunk 5: 720203 rows, 789 vehicles, 8 s
+chunk 6: 864648 rows, 855 vehicles, 9 s
+chunk 7: 1014558 rows, 931 vehicles, 9 s
+chunk 8: 1170646 rows, 1016 vehicles, 10 s
+chunk 9: 1333141 rows, 1077 vehicles, 11 s
+chunk 10: 1499166 rows, 1132 vehicles, 12 s
+chunk 11: 1667868 rows, 1214 vehicles, 13 s
+chunk 12: 1843499 rows, 1284 vehicles, 14 s
+chunk 13: 2021004 rows, 1354 vehicles, 15 s
+chunk 14: 2206151 rows, 1432 vehicles, 15 s
+chunk 15: 2396067 rows, 1509 vehicles, 17 s
+chunk 16: 2593971 rows, 1587 vehicles, 18 s
+chunk 17: 2796579 rows, 1649 vehicles, 19 s
+921763 windows (738563 train / 183200 test) from 1642 vehicles -> data/dwm_xnet

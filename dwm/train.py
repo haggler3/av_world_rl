@@ -14,12 +14,11 @@ import numpy as np
 import optax
 
 from . import model as M
-from .data import CHANNELS, F, H, NC, load
+from .data import CHANNELS, DT, F, H, LAG, NC, load
 
-DT = 0.1
 SCALE = np.array([c[2] for c in CHANNELS], np.float32)  # feature units -> physical units
 EVAL_CH = {"speed": 0, "gap": 3, "lead_v": 4, "d_line": 1}  # channel index in the future chunk
-HORIZONS = {"1s": 9, "2s": 19, "3s": 29}
+HORIZONS = {"1s": round(1 / DT) - 1, "2s": round(2 / DT) - 1, "3s": F - 1}
 
 
 class Stats:
@@ -44,7 +43,11 @@ def kinematic(cur_feat, hist, act):
     alpha = 0.05 / (0.25 + 0.05)
     for k in range(F):
         cmd = np.where(act[:, k] >= 0, 3.0 * act[:, k], 8.0 * act[:, k])
-        for _ in range(2):
+        if not LAG:  # xnet: the command is the acceleration over the step
+            vn = np.maximum(v + cmd * DT, 0.0)
+            s_ego += 0.5 * (v + vn) * DT
+            v = vn
+        for _ in range(2 if LAG else 0):
             a = a + alpha * (cmd - a)
             vn = np.maximum(v + a * 0.05, 0.0)
             s_ego += 0.5 * (v + vn) * 0.05
@@ -238,7 +241,7 @@ def metrics(pred, d, idx):
                 m = seen_now & (real[:, h, 2] > 0.5)
             out[f"crps_{name}_{hn}"] = float(crps(pred[m, :, h, c], real[m, h, c]).mean())
     for name in ("speed", "gap"):
-        c, h = EVAL_CH[name], 29
+        c, h = EVAL_CH[name], F - 1
         m = np.ones(len(idx), bool) if name == "speed" else seen_now & (real[:, h, 2] > 0.5)
         if pred.shape[1] > 1:
             lo, hi = np.percentile(pred[m, :, h, c], 5, 1), np.percentile(pred[m, :, h, c], 95, 1)
@@ -250,7 +253,7 @@ def metrics(pred, d, idx):
     r_real = np.abs(np.diff(real[m, :, 3], 2, axis=-1)).mean()
     out["roughness_gap_vs_real"] = float(r_pred / max(r_real, 1e-9))
     for name, c in (("lead_seen", 2), ("must_stop", 5)):
-        out[f"acc_{name}_3s"] = float(((pred[:, :, 29, c].mean(1) > 0.5) == (real[:, 29, c] > 0.5)).mean())
+        out[f"acc_{name}_3s"] = float(((pred[:, :, F - 1, c].mean(1) > 0.5) == (real[:, F - 1, c] > 0.5)).mean())
     return out
 
 
@@ -278,7 +281,7 @@ def main():
     os.makedirs(a.out, exist_ok=True)
     d = load_data(a.data)
     st = Stats(d)
-    cfg = M.Cfg(**json.loads(a.cfg))
+    cfg = with_latent(M.Cfg(**json.loads(a.cfg)))
     print(cfg)
     res = train(cfg, d, st, a.budget)
     idx = eval_idx(d, a.eval_n)
